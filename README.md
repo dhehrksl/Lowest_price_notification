@@ -1,0 +1,75 @@
+# 🚀 [기획 및 설계 문서] 초저가알리미 (V1 MVP)
+
+## 1. 프로젝트 개요
+* **서비스명:** 초저가알리미
+* **핵심 가치:** "아무도 몰랐던 커뮤니티 대란 특가를 가장 먼저 낚아챈다"
+* **동작 원리 (하이브리드 크롤링):** 무겁고 제약이 많은 쇼핑몰 본 서버나 딜레이가 있는 공식 API를 사용하지 않습니다. 특가 정보가 가장 빨리 올라오는 **핫딜 커뮤니티(뽐뿌, 알뜰구매 등)의 최신 글을 크롤링**하여 실시간성을 극대화합니다.
+* **수익 모델:** 사용자가 앱 내 핫딜 링크를 클릭하면 쿠팡 파트너스 링크로 자동 변환되어 수수료 수익을 창출합니다.
+
+## 2. 기술 스택 (Zero-Cost Architecture)
+자바스크립트 생태계로 풀스택을 구성하여 개발 속도를 높이고, 전면 무료 호스팅과 DB를 활용해 서버 리소스 비용을 0원으로 맞춥니다.
+
+* **Frontend (Mobile App):** `React Native` (Expo 기반 - 빠른 빌드 및 테스트)
+* **Backend (Crawler & API):** `Node.js` + `Express`
+  * 크롤링 엔진: `axios`, `cheerio` (무거운 브라우저 대신 가벼운 HTML 파싱으로 메모리 절약)
+  * 스케줄러: `node-cron`
+* **Database:** `MongoDB` (MongoDB Atlas 무료 M0 클러스터 사용)
+* **Push Notification:** `Firebase Cloud Messaging (FCM)` (알림 발송 무료)
+
+## 3. 핵심 비즈니스 로직 (Workflow)
+1. **[데이터 수집]** Node.js 백엔드 서버가 1~2분 간격으로 타겟 커뮤니티 게시판의 최신 글을 파싱합니다.
+2. **[DB 대조 및 필터링]** 파싱한 글 번호가 MongoDB `Deals` 컬렉션에 없는 새로운 글인지 확인합니다.
+3. **[키워드 매칭]** 새로운 글의 제목을 분석하여, MongoDB `Users` 컬렉션에 유저들이 등록해 둔 '키워드(예: 아이패드, 에어팟)'와 일치하는지 검사합니다.
+4. **[푸시 발송]** 키워드가 일치하는 유저들의 FCM 토큰을 모아 실시간 푸시 알림을 쏩니다.
+5. **[수익 전환]** 유저가 푸시를 누르면 앱이 열리며, 딥링크를 통해 파트너스 코드가 묻은 상태로 쇼핑몰 앱으로 연결됩니다.
+
+## 4. MVP 핵심 기능 (In & Out)
+
+### 🟢 포함할 기능 (In)
+* **맞춤 키워드 알림 설정:** 사용자가 원하는 타겟 상품(키워드) 무제한 등록.
+* **실시간 핫딜 피드 (메인 화면):** 알림을 꺼둔 유저도 언제든 들어와서 볼 수 있는 실시간 크롤링 리스트 제공.
+* **스마트 링크 변환기:** 게시글 본문에 숨겨진 쇼핑몰 원본 링크를 추출해 파트너스 링크로 치환하는 로직.
+
+### 🔴 제외할 기능 (Out) - 타 앱과의 차별화 및 리소스 절약
+* **가격 변동 그래프:** 개별 상품의 가격 히스토리를 쌓는 막대한 DB 낭비 제거.
+* **URL 직접 추적:** 개별 상품 페이지를 계속 찔러보는 무거운 스캔 기능 제외.
+* **상품 상세 이미지 파싱:** 트래픽 유발 방지를 위해 텍스트(제목) 위주로 가볍게 UI 구성.
+
+## 5. 데이터베이스 스키마 (MongoDB + Mongoose)
+```javascript
+// 📁 models/Deal.js
+const mongoose = require('mongoose');
+
+const dealSchema = new mongoose.Schema({
+  dealId: { type: String, required: true, unique: true }, // 커뮤니티 글 번호 (중복 방지)
+  title: { type: String, required: true }, // 제목 (예: "[뽐뿌] 맥북 M3 80만 대란")
+  originalUrl: { type: String, required: true }, // 커뮤니티 원본 글 링크
+  source: { type: String, required: true }, // 출처 (예: 'ppomppu', 'ruliweb')
+  createdAt: { type: Date, default: Date.now, expires: '7d' } // 💡 리소스 관리: 7일 지난 데이터 자동 삭제 (TTL)
+});
+
+module.exports = mongoose.model('Deal', dealSchema);
+```
+
+```javascript
+// 📁 models/User.js
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+  fcmToken: { type: String, required: true, unique: true }, // 푸시 발송용 기기 토큰
+  keywords: [{ type: String }], // 등록한 알림 키워드 (예: ["아이패드", "물티슈"])
+  isActive: { type: Boolean, default: true }, // 알림 수신 여부
+  lastLogin: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('User', userSchema);
+```
+
+## 6. 앱 화면 구조 (Screen Flow)
+* **Screen 1: 실시간 핫딜 리스트 (Home)**
+  * 가장 최근에 크롤링된 대란 리스트 노출 (당겨서 새로고침)
+  * 직관적인 '쿠팡에서 확인하기' 메인 버튼 배치
+* **Screen 2: 초저가 키워드 스나이퍼 (Keyword)**
+  * 내 알림 키워드 추가/삭제 UI
+* **Screen 3: 내 정보 (Profile)**
+  * 전체 푸시 알림 토글, 문의하기 기능
