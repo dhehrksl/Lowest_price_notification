@@ -8,19 +8,19 @@ import ProfileScreen from '../screens/ProfileScreen';
 const Tab = createBottomTabNavigator();
 
 const TAB_ICONS: Record<string, string> = {
-  Home: '🔥',
-  Keyword: '🔔',
-  Profile: '⚙️',
+  Home: '\u{1F525}',
+  Keyword: '\u{1F514}',
+  Profile: '\u2699',
 };
 
 export default function AppNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerTitleStyle: { fontWeight: 'bold' as const },
         tabBarActiveTintColor: '#007bff',
-        tabBarIcon: () => (
-          <Text style={{ fontSize: 20 }}>{TAB_ICONS[route.name]}</Text>
+        tabBarIcon: ({ color }: { color: string }) => (
+          <Text style={{ fontSize: 20, color }}>{TAB_ICONS[route.name]}</Text>
         ),
       })}
     >
