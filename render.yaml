@@ -1,0 +1,23 @@
+# Render Blueprint — GitHub 연결 후 "New Blueprint Instance"로 원클릭 배포
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: hotdeal-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore  # 한국에서 가장 가까운 Render 리전
+    plan: free
+    autoDeploy: true   # main 브랜치 push 시 자동 배포
+    envVars:
+      - key: PORT
+        value: "4000"
+      - key: MONGODB_URI
+        sync: false    # Render 대시보드에서 직접 입력
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+    healthCheckPath: /
